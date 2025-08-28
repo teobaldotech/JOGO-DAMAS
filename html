@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Jogo de Damas - 2 Jogadores</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #f0f0f0;
+    }
+
+    #menu {
+      margin-top: 30px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px;
+      cursor: pointer;
+    }
+
+    #game {
+      display: grid;
+      grid-template-columns: repeat(8, 60px);
+      grid-template-rows: repeat(8, 60px);
+      margin: 20px auto;
+      border: 2px solid #333;
+    }
+
+    .square {
+      width: 60px;
+      height: 60px;
+    }
+
+    .dark {
+      background-color: #769656;
+    }
+
+    .light {
+      background-color: #eeeed2;
+    }
+
+    .piece {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      margin: 5px;
+      cursor: pointer;
+    }
+
+    .black {
+      background-color: black;
+    }
+
+    .white {
+      background-color: white;
+      border: 2px solid #aaa;
+    }
+
+    .king::after {
+      content: "👑";
+      display: block;
+      text-align: center;
+      font-size: 18px;
+      margin-top: -35px;
+    }
+
+    #status {
+      margin-top: 10px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Jogo de Damas - 2 Jogadores</h1>
+
+  <div id="menu">
+    <button onclick="startGame()">Iniciar Jogo</button>
+  </div>
+
+  <div id="status"></div>
+  <button id="restartBtn" style="display:none;" onclick="restartGame()">Reiniciar</button>
+  <div id="game" style="display:none;"></div>
+
+  <script>
+    const game = document.getElementById('game');
+    const statusDiv = document.getElementById('status');
+    const restartBtn = document.getElementById('restartBtn');
+    let board = [];
+    let currentPlayer = 'black';
+    let selectedPiece = null;
+    let possibleMoves = [];
+    let mustContinueCapture = false;
+
+    function startGame() {
+      document.getElementById('menu').style.display = 'none';
+      restartBtn.style.display = 'inline-block';
+      game.style.display = 'grid';
+      currentPlayer = 'black';
+      selectedPiece = null;
+      mustContinueCapture = false;
+      initBoard();
+      updateStatus();
+    }
+
+    function restartGame() {
+      selectedPiece = null;
+      possibleMoves = [];
+      currentPlayer = 'black';
+      mustContinueCapture = false;
+      initBoard();
+      updateStatus();
+      game.style.pointerEvents = 'auto'; // desbloqueia tabuleiro ao reiniciar
+    }
+
+    function initBoard() {
+      game.innerHTML = '';
+      board = [];
+      for (let row = 0; row < 8; row++) {
+        board[row] = [];
+        for (let col = 0; col < 8; col++) {
+          const square = document.createElement('div');
+          square.classList.add('square');
+          square.dataset.row = row;
+          square.dataset.col = col;
+
+          if ((row + col) % 2 === 0) {
+            square.classList.add('light');
+            board[row][col] = null;
+          } else {
+            square.classList.add('dark');
+            if (row < 3) {
+              board[row][col] = { color: 'white', king: false };
+            } else if (row > 4) {
+              board[row][col] = { color: 'black', king: false };
+            } else {
+              board[row][col] = null;
+            }
+          }
+
+          square.addEventListener('click', handleClick);
+          game.appendChild(square);
+        }
+      }
+      renderBoard();
+    }
+
+    function renderBoard() {
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const square = getSquare(row, col);
+          square.innerHTML = '';
+          const piece = board[row][col];
+          if (piece) {
+            const el = document.createElement('div');
+            el.classList.add('piece', piece.color);
+            if (piece.king) el.classList.add('king');
+            square.appendChild(el);
+          }
+          square.style.outline = '';
+        }
+      }
+    }
+
+    function getSquare(row, col) {
+      return document.querySelector(`.square[data-row='${row}'][data-col='${col}']`);
+    }
+
+    function handleClick(e) {
+      const row = parseInt(e.currentTarget.dataset.row);
+      const col = parseInt(e.currentTarget.dataset.col);
+      const piece = board[row][col];
+
+      if (selectedPiece && isMoveAllowed(row, col)) {
+        movePiece(selectedPiece.row, selectedPiece.col, row, col);
+        return;
+      }
+
+      if (piece && piece.color === currentPlayer && !mustContinueCapture) {
+        selectedPiece = { row, col };
+        highlightMoves(row, col);
+      }
+    }
+
+    function clearHighlights() {
+      document.querySelectorAll('.square').forEach(sq => {
+        sq.style.outline = '';
+      });
+      possibleMoves = [];
+    }
+
+    function isMoveAllowed(row, col) {
+      return possibleMoves.some(m => m.row === row && m.col === col);
+    }
+
+    function highlightMoves(row, col) {
+      clearHighlights();
+
+      if (hasAnyCapture(currentPlayer)) {
+        possibleMoves = getValidMoves(row, col, board[row][col], true);
+      } else {
+        possibleMoves = getValidMoves(row, col, board[row][col], false);
+      }
+
+      possibleMoves.forEach(move => {
+        getSquare(move.row, move.col).style.outline = '2px solid red';
+      });
+    }
+
+    function getValidMoves(row, col, piece, enforceCapture) {
+      let moves = [];
+
+      if (piece.king) {
+        // Dama - movimento livre na diagonal e captura múltipla
+        const directions = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+        let captures = [];
+
+        for (const [dr, dc] of directions) {
+          let r = row + dr;
+          let c = col + dc;
+          let captured = null;
+
+          while (inBounds(r, c)) {
+            if (board[r][c] === null) {
+              if (!captured) {
+                if (!enforceCapture) moves.push({ row: r, col: c });
+              } else {
+                captures.push({ row: r, col: c, capture: captured });
+              }
+            } else {
+              if (board[r][c].color === piece.color) break;
+              if (!captured) {
+                captured = [r, c];
+              } else {
+                break;
+              }
+            }
+            r += dr;
+            c += dc;
+          }
+        }
+        if (enforceCapture && captures.length > 0) return captures;
+        if (enforceCapture) return [];
+        return moves;
+
+      } else {
+        // Peças normais
+        const directions = piece.color === 'black' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
+
+        // Capturas
+        for (const [dr, dc] of directions) {
+          const midRow = row + dr;
+          const midCol = col + dc;
+          const newRow = row + dr * 2;
+          const newCol = col + dc * 2;
+
+          if (
+            inBounds(midRow, midCol) &&
+            inBounds(newRow, newCol) &&
+            board[midRow][midCol] &&
+            board[midRow][midCol].color !== piece.color &&
+            board[newRow][newCol] === null
+          ) {
+            moves.push({ row: newRow, col: newCol, capture: [midRow, midCol] });
+          }
+        }
+        if (enforceCapture && moves.length > 0) return moves;
+
+        // Movimentos simples
+        for (const [dr, dc] of directions) {
+          const newRow = row + dr;
+          const newCol = col + dc;
+          if (inBounds(newRow, newCol) && board[newRow][newCol] === null) {
+            moves.push({ row: newRow, col: newCol });
+          }
+        }
+        return moves;
+      }
+    }
+
+    function inBounds(row, col) {
+      return row >= 0 && row < 8 && col >= 0 && col < 8;
+    }
+
+    function movePiece(fromRow, fromCol, toRow, toCol) {
+      const piece = board[fromRow][fromCol];
+      const move = possibleMoves.find(m => m.row === toRow && m.col === toCol);
+      if (!move) return;
+
+      // Remove peça capturada
+      if (move.capture) {
+        const [capRow, capCol] = move.capture;
+        board[capRow][capCol] = null;
+      }
+
+      board[fromRow][fromCol] = null;
+
+      // Tornar dama se chegar ao fim
+      const isKingNow =
+        (piece.color === 'black' && toRow === 0) ||
+        (piece.color === 'white' && toRow === 7);
+
+      board[toRow][toCol] = {
+        color: piece.color,
+        king: piece.king || isKingNow
+      };
+
+      renderBoard();
+
+      // Verificar se deve continuar captura múltipla
+      if (move.capture) {
+        const newCaptures = getValidMoves(toRow, toCol, board[toRow][toCol], true);
+        if (newCaptures.length > 0) {
+          mustContinueCapture = true;
+          selectedPiece = { row: toRow, col: toCol };
+          highlightMoves(toRow, toCol);
+          updateStatus(`${capitalize(currentPlayer)} deve continuar capturando!`);
+          return;
+        }
+      }
+
+      mustContinueCapture = false;
+      selectedPiece = null;
+      toggleTurn();
+    }
+
+    function toggleTurn() {
+      currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+
+      if (!hasAnyMove(currentPlayer)) {
+        updateStatus(`Fim de jogo! Jogador ${capitalize(opponent(currentPlayer))} venceu!`);
+        game.style.pointerEvents = 'none'; // bloqueia tabuleiro
+        return;
+      }
+
+      updateStatus();
+    }
+
+    function updateStatus(text) {
+      if (text) {
+        statusDiv.textContent = text;
+      } else {
+        statusDiv.textContent = `Vez do jogador: ${capitalize(currentPlayer)}`;
+      }
+    }
+
+    function hasAnyCapture(player) {
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const piece = board[r][c];
+          if (piece && piece.color === player) {
+            const caps = getValidMoves(r, c, piece, true);
+            if (caps.length > 0) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function hasAnyMove(player) {
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const piece = board[r][c];
+          if (piece && piece.color === player) {
+            const moves = getValidMoves(r, c, piece, false);
+            if (moves.length > 0) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function opponent(player) {
+      return player === 'black' ? 'white' : 'black';
+    }
+
+    function capitalize(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+  </script>
+</body>
+</html>
