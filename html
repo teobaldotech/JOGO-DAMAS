@@ -14,7 +14,7 @@
       margin-top: 30px;
     }
 
-    button {
+    button, select {
       padding: 10px 20px;
       font-size: 16px;
       margin: 10px;
@@ -34,14 +34,6 @@
       height: 60px;
     }
 
-    .dark {
-      background-color: #769656;
-    }
-
-    .light {
-      background-color: #eeeed2;
-    }
-
     .piece {
       width: 50px;
       height: 50px;
@@ -51,12 +43,12 @@
     }
 
     .black {
-      background-color: black;
+      background-color: #0d47a1; /* azul escuro */
     }
 
     .white {
-      background-color: white;
-      border: 2px solid #aaa;
+      background-color: #fff; /* branco */
+      border: 2px solid #0d47a1;
     }
 
     .king::after {
@@ -78,6 +70,15 @@
 
   <div id="menu">
     <button onclick="startGame()">Iniciar Jogo</button>
+    <br>
+    <label for="themeSelect">Tema do Tabuleiro:</label>
+    <select id="themeSelect" onchange="changeTheme(this.value)">
+      <option value="moderno">Moderno (Verde)</option>
+      <option value="madeira">Madeira (Clássico)</option>
+      <option value="pretoBranco">Preto e Branco</option>
+      <option value="neon">Neon</option>
+      <option value="azul">Azul e Cinza</option>
+    </select>
   </div>
 
   <div id="status"></div>
@@ -95,7 +96,7 @@
     let mustContinueCapture = false;
 
     function startGame() {
-      document.getElementById('menu').style.display = 'none';
+      document.getElementById('menu').style.display = 'block';
       restartBtn.style.display = 'inline-block';
       game.style.display = 'grid';
       currentPlayer = 'black';
@@ -103,6 +104,7 @@
       mustContinueCapture = false;
       initBoard();
       updateStatus();
+      changeTheme(document.getElementById("themeSelect").value);
     }
 
     function restartGame() {
@@ -112,7 +114,8 @@
       mustContinueCapture = false;
       initBoard();
       updateStatus();
-      game.style.pointerEvents = 'auto'; // desbloqueia tabuleiro ao reiniciar
+      game.style.pointerEvents = 'auto'; 
+      changeTheme(document.getElementById("themeSelect").value);
     }
 
     function initBoard() {
@@ -213,7 +216,6 @@
       let moves = [];
 
       if (piece.king) {
-        // Dama - movimento livre na diagonal e captura múltipla
         const directions = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
         let captures = [];
 
@@ -244,12 +246,9 @@
         if (enforceCapture && captures.length > 0) return captures;
         if (enforceCapture) return [];
         return moves;
-
       } else {
-        // Peças normais
         const directions = piece.color === 'black' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
 
-        // Capturas
         for (const [dr, dc] of directions) {
           const midRow = row + dr;
           const midCol = col + dc;
@@ -268,7 +267,6 @@
         }
         if (enforceCapture && moves.length > 0) return moves;
 
-        // Movimentos simples
         for (const [dr, dc] of directions) {
           const newRow = row + dr;
           const newCol = col + dc;
@@ -289,7 +287,6 @@
       const move = possibleMoves.find(m => m.row === toRow && m.col === toCol);
       if (!move) return;
 
-      // Remove peça capturada
       if (move.capture) {
         const [capRow, capCol] = move.capture;
         board[capRow][capCol] = null;
@@ -297,7 +294,6 @@
 
       board[fromRow][fromCol] = null;
 
-      // Tornar dama se chegar ao fim
       const isKingNow =
         (piece.color === 'black' && toRow === 0) ||
         (piece.color === 'white' && toRow === 7);
@@ -309,7 +305,6 @@
 
       renderBoard();
 
-      // Verificar se deve continuar captura múltipla
       if (move.capture) {
         const newCaptures = getValidMoves(toRow, toCol, board[toRow][toCol], true);
         if (newCaptures.length > 0) {
@@ -331,7 +326,7 @@
 
       if (!hasAnyMove(currentPlayer)) {
         updateStatus(`Fim de jogo! Jogador ${capitalize(opponent(currentPlayer))} venceu!`);
-        game.style.pointerEvents = 'none'; // bloqueia tabuleiro
+        game.style.pointerEvents = 'none'; 
         return;
       }
 
@@ -378,6 +373,35 @@
 
     function capitalize(str) {
       return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    function changeTheme(theme) {
+      let darkColor, lightColor;
+
+      switch(theme) {
+        case "madeira":
+          darkColor = "#8b5a2b";
+          lightColor = "#f4e1c1";
+          break;
+        case "pretoBranco":
+          darkColor = "#000";
+          lightColor = "#fff";
+          break;
+        case "neon":
+          darkColor = "#111";
+          lightColor = "#444";
+          break;
+        case "azul":
+          darkColor = "#1565c0";
+          lightColor = "#e3f2fd";
+          break;
+        default: // moderno
+          darkColor = "#2e7d32";
+          lightColor = "#c8e6c9";
+      }
+
+      document.querySelectorAll(".dark").forEach(sq => sq.style.backgroundColor = darkColor);
+      document.querySelectorAll(".light").forEach(sq => sq.style.backgroundColor = lightColor);
     }
   </script>
 </body>
